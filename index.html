@@ -1,14 +1,24 @@
 <!DOCTYPE html>
 <html>
+<head>
+  <title>Hyperbeam VM</title>
+  <meta charset="UTF-8">
+</head>
 <body style="margin:0;padding:0;">
-  <iframe id="vm" style="width:100%;height:100vh;border:0"></iframe>
+  <iframe id="vm" style="width:100%;height:100vh;border:0;"></iframe>
 
   <script>
-    fetch('https://hb-key-gen-hyperbeam1234.my18plusemailforyt.workers.dev')
-      .then(res => res.json())
-      .then(data => {
+    async function loadVM() {
+      try {
+        const res = await fetch('https://my-hb-worker.YOUR_WORKER.workers.dev/')
+        const data = await res.json()
         document.getElementById('vm').src = data.embed_url
-      })
+      } catch (e) {
+        console.error("Failed to load VM:", e)
+      }
+    }
+
+    loadVM()
   </script>
 </body>
 </html>
