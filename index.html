@@ -2,86 +2,159 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Hyperbeam VM</title>
+<title>Hyperbeam VM Launcher</title>
 <style>
-body { margin:0; font-family: Arial,sans-serif; display:flex; flex-direction:column; height:100vh; background:#1e1e1e; color:#fff; }
-header { padding:10px 20px; background:#282828; display:flex; flex-direction:column; }
-#buttons { display:flex; gap:10px; align-items:center; margin-top:5px; }
-button { padding:6px 12px; background:#4CAF50; border:none; border-radius:5px; color:white; cursor:pointer; }
-button:hover { background:#45a049; }
-#info { font-size:12px; color:#ccc; margin-top:5px; word-break:break-all; }
-iframe { flex:1; border:none; width:100%; }
+  body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background: #1e1e1e;
+    color: #fff;
+  }
+
+  header {
+    padding: 10px 20px;
+    background: #282828;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header h1 {
+    font-size: 18px;
+    margin: 0 0 5px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  #buttons {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  button {
+    padding: 6px 12px;
+    font-size: 14px;
+    background: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  button:hover { background: #45a049; }
+
+  #info {
+    font-size: 12px;
+    color: #ccc;
+    margin-top: 5px;
+    word-break: break-all;
+  }
+
+  iframe {
+    flex: 1;
+    border: none;
+    width: 100%;
+  }
+
+  /* Popup modal styles */
+  #errorPopup {
+    display: none;
+    position: fixed;
+    top: 20%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #333;
+    color: #fff;
+    border: 2px solid #f00;
+    border-radius: 8px;
+    padding: 20px;
+    max-width: 90%;
+    z-index: 1000;
+    box-shadow: 0 0 15px #f00;
+  }
+
+  #errorPopup button {
+    margin-top: 10px;
+    background: #f00;
+  }
 </style>
 </head>
 <body>
 
 <header>
-  <div id="buttons">
-    <button id="newVM">New VM</button>
-    <span id="status">Loading...</span>
-  </div>
+  <h1>
+    Hyperbeam VM Launcher
+    <div id="buttons">
+      <button id="newVM">New VM</button>
+      <span id="status">Loading...</span>
+    </div>
+  </h1>
   <div id="info">Fetching VM info...</div>
 </header>
 
 <iframe id="vm"></iframe>
 
+<!-- Error popup -->
+<div id="errorPopup">
+  <div id="errorContent"></div>
+  <button id="closePopup">Close</button>
+</div>
+
 <script>
-const WORKER_URL = "https://your-worker-url.workers.dev/"; // replace with your Worker URL
-const iframeEl = document.getElementById('vm');
+const workerURL = 'https://my-hb-worker.YOUR_WORKER.workers.dev/'; // Replace with your Worker URL
 const infoEl = document.getElementById('info');
 const statusEl = document.getElementById('status');
-
-let currentVM = null; // store current VM info
+const iframeEl = document.getElementById('vm');
+const errorPopup = document.getElementById('errorPopup');
+const errorContent = document.getElementById('errorContent');
+const closePopupBtn = document.getElementById('closePopup');
 
 async function spawnVM() {
   statusEl.textContent = "Loading VM...";
   infoEl.textContent = "Fetching VM info...";
-  
-  // If we already have a VM, reuse it
-  if (currentVM && currentVM.embed_url) {
-    iframeEl.src = currentVM.embed_url;
-    statusEl.textContent = "VM Loaded (reused)!";
-    infoEl.innerHTML = formatInfo(currentVM);
-    return;
-  }
-
   try {
-    const res = await fetch(WORKER_URL);
+    const res = await fetch(workerURL);
     const data = await res.json();
-    
-    if (data.error) {
-      infoEl.textContent = "Error: " + JSON.stringify(data.error);
-      statusEl.textContent = "VM Error";
-      return;
+
+    if (data.embed_url) {
+      iframeEl.src = data.embed_url; // dynamically set iframe
+      statusEl.textContent = "VM Loaded!";
     }
 
-    currentVM = data; // save VM info
-    iframeEl.src = data.embed_url;
-    statusEl.textContent = "VM Loaded!";
-    infoEl.innerHTML = formatInfo(data);
+    infoEl.innerHTML = `
+      <strong>Embed URL:</strong> <a href="${data.embed_url}" target="_blank">${data.embed_url}</a><br>
+      <strong>Session ID:</strong> ${data.session_id || 'N/A'}<br>
+      <strong>Admin Token:</strong> ${data.admin_token || 'N/A'}<br>
+      <strong>API Key:</strong> ${data.api_key || 'N/A'}
+    `;
 
-  } catch(err) {
-    infoEl.textContent = "Error: " + err.toString();
-    statusEl.textContent = "VM Error";
+    if (data.error) {
+      showErrorPopup(JSON.stringify(data.error));
+    }
+  } catch (err) {
+    showErrorPopup(err.toString());
   }
 }
 
-function formatInfo(data) {
-  return `
-    <strong>Embed URL:</strong> <a href="${data.embed_url}" target="_blank">${data.embed_url}</a><br>
-    <strong>Session ID:</strong> ${data.session_id || 'N/A'}<br>
-    <strong>Admin Token:</strong> ${data.admin_token || 'N/A'}
-  `;
+function showErrorPopup(message) {
+  errorContent.textContent = message;
+  errorPopup.style.display = 'block';
 }
 
-// Spawn first VM on load
+closePopupBtn.addEventListener('click', () => {
+  errorPopup.style.display = 'none';
+});
+
+// Spawn first VM on page load
 spawnVM();
 
-// Button spawns a new VM (forces new curl)
-document.getElementById('newVM').addEventListener('click', ()=>{
-  currentVM = null; // clear old VM
-  spawnVM();
-});
+// Button spawns a new VM
+document.getElementById('newVM').addEventListener('click', spawnVM);
 </script>
 
 </body>
