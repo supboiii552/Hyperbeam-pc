@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hyperbeam on GitHub Pages</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin: 0;
+      padding: 2rem;
+      background-color: #f0f2f5;
+      color: #333;
+      min-height: 100vh;
+      box-sizing: border-box;
+    }
+    .container {
+      width: 100%;
+      max-width: 1000px;
+      padding: 20px;
+      box-sizing: border-box;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+      text-align: center;
+    }
+    #hyperbeam-container {
+      width: 100%;
+      height: 600px;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      margin-top: 20px;
+      overflow: hidden;
+    }
+    h1 {
+      color: #1a1a1a;
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+    }
+    p#status {
+      font-size: 1.1rem;
+      color: #666;
+    }
+    .loading-spinner {
+      border: 4px solid rgba(0, 0, 0, 0.1);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border-left-color: #007bff;
+      animation: spin 1s ease infinite;
+      margin: 20px auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Hyperbeam Virtual PC</h1>
+    <p id="status">Loading your session, please wait...</p>
+    <div class="loading-spinner"></div>
+    <div id="hyperbeam-container"></div>
+  </div>
+
+  <!-- Include the Hyperbeam client-side SDK -->
+  <script src="https://unpkg.com/@hyperbeam/web-sdk"></script>
+
+  <script>
+    // ** !!! IMPORTANT: REPLACE THIS URL WITH YOUR CLOUDFLARE WORKER'S URL !!! **
+    const BACKEND_SERVER_URL = 'https://myfirsthyperbeampc898989898989.my18plusemailforyt.workers.dev';
+
+    const statusElement = document.getElementById('status');
+    const container = document.getElementById('hyperbeam-container');
+    const spinner = document.querySelector('.loading-spinner');
+
+    async function loadHyperbeam() {
+      spinner.style.display = 'block'; // Show spinner
+      container.style.display = 'none'; // Hide container initially
+      
+      try {
+        const response = await fetch(BACKEND_SERVER_URL);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        const embedURL = data.embedUrl;
+
+        if (embedURL) {
+          statusElement.textContent = 'Session loaded! Enjoy your virtual PC.';
+          spinner.style.display = 'none'; // Hide spinner
+          container.style.display = 'block'; // Show container
+          await Hyperbeam(container, embedURL);
+        } else {
+          statusElement.textContent = 'Error: Could not retrieve Hyperbeam URL.';
+          console.error('API response did not contain embedUrl:', data);
+          spinner.style.display = 'none';
+        }
+      } catch (error) {
+        statusElement.textContent = 'Error: Failed to connect to the backend server. Check your Cloudflare Worker URL.';
+        console.error('Error fetching Hyperbeam URL:', error);
+        spinner.style.display = 'none';
+      }
+    }
+
+    // Load the Hyperbeam session when the page loads
+    window.onload = loadHyperbeam;
+  </script>
+</body>
+</html>
