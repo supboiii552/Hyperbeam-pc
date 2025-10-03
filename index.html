@@ -1,24 +1,84 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Hyperbeam VM</title>
   <meta charset="UTF-8">
+  <title>Hyperbeam VM Launcher</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      background: #1e1e1e;
+      color: #fff;
+    }
+
+    header {
+      padding: 10px 20px;
+      background: #282828;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    h1 {
+      font-size: 18px;
+      margin: 0;
+    }
+
+    button {
+      padding: 8px 16px;
+      font-size: 14px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background: #45a049;
+    }
+
+    iframe {
+      flex: 1;
+      border: none;
+      width: 100%;
+      height: 100%;
+    }
+  </style>
 </head>
-<body style="margin:0;padding:0;">
-  <iframe id="vm" style="width:100%;height:100vh;border:0;"></iframe>
+<body>
+
+  <header>
+    <h1>Hyperbeam VM Launcher</h1>
+    <button id="newVM">New VM</button>
+  </header>
+
+  <iframe id="vm"></iframe>
 
   <script>
-    async function loadVM() {
+    const workerURL = 'https://my-hb-worker.YOUR_WORKER.workers.dev/'; // Replace with your Worker URL
+
+    async function spawnVM() {
       try {
-        const res = await fetch('https://hb-key-gen-hyperbeam1234.my18plusemailforyt.workers.dev')
-        const data = await res.json()
-        document.getElementById('vm').src = data.embed_url
-      } catch (e) {
-        console.error("Failed to load VM:", e)
+        const res = await fetch(workerURL);
+        const data = await res.json();
+        document.getElementById('vm').src = data.embed_url;
+      } catch (err) {
+        console.error("Failed to load VM:", err);
+        alert("Failed to load VM. Check console for details.");
       }
     }
 
-    loadVM()
+    // Spawn first VM automatically on page load
+    spawnVM();
+
+    // Button click spawns a fresh VM
+    document.getElementById('newVM').addEventListener('click', spawnVM);
   </script>
+
 </body>
 </html>
