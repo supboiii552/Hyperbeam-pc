@@ -2,87 +2,135 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Hyperbeam VM - Credit Saver</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hyperbeam VM - Persistent Workspace</title>
 <style>
-  body { margin: 0; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; background: #121212; color: #fff; }
-  header { padding: 10px 20px; background: #1f1f1f; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; }
-  button { padding: 8px 16px; border-radius: 4px; border: none; cursor: pointer; font-weight: 600; margin-right: 10px; }
-  #newBtn { background: #2ecc71; color: white; }
-  #stopBtn { background: #e74c3c; color: white; }
-  iframe { flex: 1; border: none; background: #000; }
-  #status { font-size: 13px; color: #999; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; height: 100vh; background: #0f1115; color: #e6edf3; }
+  header { padding: 10px 16px; background: #161b22; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #30363d; gap: 12px; }
+  .controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  button { padding: 7px 14px; border-radius: 6px; border: 1px solid transparent; cursor: pointer; font-weight: 600; font-size: 13px; transition: opacity 0.15s ease; }
+  button:hover { opacity: 0.85; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  #startBtn { background: #238636; color: #fff; border-color: rgba(240,246,252,0.1); }
+  #stopBtn { background: #da3633; color: #fff; border-color: rgba(240,246,252,0.1); }
+  #resetProfileBtn { background: #21262d; color: #c9d1d9; border-color: #30363d; }
+  .meta { display: flex; align-items: center; gap: 12px; font-size: 12px; font-family: ui-monospace, monospace; }
+  #status { color: #8b949e; }
+  #profileTag { background: #0d1117; padding: 3px 8px; border-radius: 4px; border: 1px solid #30363d; color: #58a6ff; }
+  iframe { flex: 1; border: none; background: #000; width: 100%; }
 </style>
 </head>
 <body>
 
 <header>
-  <div>
-    <button id="newBtn">Start New VM</button>
-    <button id="stopBtn">STOP VM (Saves Credits)</button>
-    <span id="status">Ready</span>
+  <div class="controls">
+    <button id="startBtn">Start VM</button>
+    <button id="stopBtn" disabled>Stop VM</button>
+    <button id="resetProfileBtn" title="Deletes your saved browser profile ID to start completely fresh">Reset Profile</button>
+  </div>
+  <div class="meta">
+    <span id="profileTag">profile: none</span>
+    <span id="status">idle</span>
   </div>
 </header>
 
-<iframe id="vmFrame"></iframe>
+<iframe id="vmFrame" allow="camera; microphone; display-capture; autoplay; clipboard-read; clipboard-write; fullscreen"></iframe>
 
 <script>
-  // Updated to your new Worker URL
-  const WORKER_URL = 'https://tight-brook-82e6.leongwilhelm.workers.dev/'; 
+  const WORKER_URL = 'https://tight-brook-82e6.leongwilhelm.workers.dev/';
 
   const frame = document.getElementById('vmFrame');
-  const status = document.getElementById('status');
+  const statusEl = document.getElementById('status');
+  const profileTag = document.getElementById('profileTag');
+  const startBtn = document.getElementById('startBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  const resetBtn = document.getElementById('resetProfileBtn');
+
+  function getOrCreateProfile() {
+    let pid = localStorage.getItem('hb_profile_id');
+    if (!pid) {
+      pid = 'prof_' + Math.random().toString(36).substring(2, 10);
+      localStorage.setItem('hb_profile_id', pid);
+    }
+    profileTag.textContent = `profile: ${pid}`;
+    return pid;
+  }
 
   async function startVM() {
-    // If a session is already stored, use it instead of starting a new one
-    const savedUrl = localStorage.getItem('hb_url');
-    if (savedUrl) {
-      frame.src = savedUrl;
-      status.textContent = "Resumed session.";
-      return;
-    }
+    startBtn.disabled = true;
+    stopBtn.disabled = true;
+    statusEl.textContent = 'spawning persistent vm...';
 
-    status.textContent = "Spawning VM...";
+    const profileId = getOrCreateProfile();
+
     try {
-      const res = await fetch(WORKER_URL);
+      const res = await fetch(WORKER_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile_id: profileId })
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
+
       if (data.embed_url) {
-        localStorage.setItem('hb_url', data.embed_url);
-        localStorage.setItem('hb_id', data.session_id);
+        sessionStorage.setItem('hb_session_id', data.session_id);
         frame.src = data.embed_url;
-        status.textContent = "VM Running";
+        statusEl.textContent = 'active';
+        stopBtn.disabled = false;
+      } else {
+        throw new Error('missing embed_url');
       }
-    } catch (e) { status.textContent = "Error."; }
+    } catch (err) {
+      statusEl.textContent = `error: ${err.message}`;
+      startBtn.disabled = false;
+    }
   }
 
   async function stopVM() {
-    const id = localStorage.getItem('hb_id');
-    if (!id) return;
+    const sessionId = sessionStorage.getItem('hb_session_id');
+    if (!sessionId) {
+      frame.src = '';
+      statusEl.textContent = 'no active session';
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      return;
+    }
 
-    // This sends the "Kill" signal to your worker
-    await fetch(WORKER_URL, {
-      method: 'DELETE',
-      body: JSON.stringify({ session_id: id }),
-      keepalive: true // Crucial: lets the request finish even if you close the tab
-    });
+    startBtn.disabled = true;
+    stopBtn.disabled = true;
+    statusEl.textContent = 'terminating vm...';
 
-    localStorage.clear();
-    frame.src = "";
-    status.textContent = "VM Terminated.";
+    try {
+      await fetch(WORKER_URL, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionId }),
+        keepalive: true
+      });
+    } catch (e) {
+      // ignore network teardown errors on unload
+    }
+
+    sessionStorage.removeItem('hb_session_id');
+    frame.src = '';
+    statusEl.textContent = 'stopped (profile saved)';
+    startBtn.disabled = false;
   }
 
-  // Auto-stop when tab is closed or page is refreshed
-  window.addEventListener('beforeunload', () => {
-    stopVM();
+  resetBtn.addEventListener('click', () => {
+    if (confirm('generate a brand new profile id? this disconnects previous saved browser data.')) {
+      localStorage.removeItem('hb_profile_id');
+      getOrCreateProfile();
+    }
   });
 
-  document.getElementById('newBtn').addEventListener('click', async () => {
-    await stopVM();
-    startVM();
-  });
+  startBtn.addEventListener('click', startVM);
+  stopBtn.addEventListener('click', stopVM);
 
-  document.getElementById('stopBtn').addEventListener('click', stopVM);
-
-  startVM();
+  // initialize profile label
+  getOrCreateProfile();
 </script>
 </body>
 </html>
